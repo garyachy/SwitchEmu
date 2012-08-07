@@ -1,0 +1,12 @@
+#!/bin/bash
+
+brctl addbr mybridge1
+brctl addif mybridge1 tap100
+brctl addif mybridge1 tap200
+
+
+brctl addbr mybridge2
+brctl addif mybridge2 tap101
+brctl addif mybridge2 tap201
+
+brctl show
