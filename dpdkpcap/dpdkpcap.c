@@ -65,6 +65,11 @@ DpdkPcapResultCode_t globalInit()
         return DPDKPCAP_FAILURE;
     }
 
+    if (rte_pmd_init_all() < 0)
+    {
+        return DPDKPCAP_FAILURE;
+    }
+
     if (rte_eal_pci_probe() < 0)
     {
         return DPDKPCAP_FAILURE;
@@ -162,6 +167,8 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
         printf ("Could not start the device %d", deviceId);
         return DPDKPCAP_FAILURE;
     }
+
+    rte_eth_promiscuous_enable(deviceId);
 
     portInitFinished[deviceId] = 1;
 
