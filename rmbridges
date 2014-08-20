@@ -1,6 +1,0 @@
-#!/bin/bash
-
-brctl delbr mybridge1
-brctl delbr mybridge2
-
-brctl show
