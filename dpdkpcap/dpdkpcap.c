@@ -49,7 +49,7 @@ DpdkPcapResultCode_t globalInit()
 {
     char  arg0[] = "program";
     char  arg1[] = "-c";
-    char  arg2[] = "0x07";
+    char  arg2[] = "0x03";
     char  arg3[] = "-n";
     char  arg4[] = "2";
     char* argv[] = { &arg0[0], &arg1[0], &arg2[0], &arg3[0], &arg4[0], NULL };

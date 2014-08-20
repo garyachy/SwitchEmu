@@ -5,7 +5,7 @@ OBJ = $(SRC:.cpp=.o)
  
 OUT = ./dpdkpcap_test
 
-RTE_TARGET = x86_64-native-linuxapp-gcc
+#RTE_TARGET = x86_64-native-linuxapp-gcc
  
 # include directories
 INCLUDES = -I. -I$(RTE_SDK)/$(RTE_TARGET)/include
