@@ -1,7 +1,7 @@
 # source files.
 SRC = main.cpp
  
-OBJ = $(SRC:.c=.o)
+OBJ = $(SRC:.cpp=.o)
  
 OUT = ./dpdkpcap_test
 
@@ -45,4 +45,4 @@ $(OUT): $(OBJ)
 all: $(OUT)
  
 clean:
-	rm -f $(OBJ) $(OUT) Makefile.bak
+	rm -f $(OBJ) $(OUT)

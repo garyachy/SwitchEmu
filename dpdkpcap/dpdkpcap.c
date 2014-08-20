@@ -49,7 +49,7 @@ DpdkPcapResultCode_t globalInit()
 {
     char  arg0[] = "program";
     char  arg1[] = "-c";
-    char  arg2[] = "0x03";
+    char  arg2[] = "0x07";
     char  arg3[] = "-n";
     char  arg4[] = "2";
     char* argv[] = { &arg0[0], &arg1[0], &arg2[0], &arg3[0], &arg4[0], NULL };
@@ -100,6 +100,8 @@ DpdkPcapResultCode_t globalInit()
         return DPDKPCAP_FAILURE;
     }
 
+    printf ("Global init succedded");
+
     initFinished = 1;
     return DPDKPCAP_OK;
 }
@@ -110,6 +112,7 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
     struct rte_eth_rxconf rxConf;
     struct rte_eth_txconf txConf;
     int queueId = 0;
+    int ret;
 
     memset(&portConf, 0, sizeof(portConf));
     memset(&rxConf, 0, sizeof(rxConf));
@@ -120,9 +123,17 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
         return DPDKPCAP_OK;
     }
 
-    if (rte_eth_dev_configure(deviceId, DPDKPCAP_RX_QUEUE_NUMBER, DPDKPCAP_TX_QUEUE_NUMBER, &portConf) < 1)
+    portConf.rxmode.split_hdr_size = 0;
+    portConf.rxmode.header_split   = 0;
+    portConf.rxmode.hw_ip_checksum = 0;
+    portConf.rxmode.hw_vlan_filter = 0;
+    portConf.rxmode.jumbo_frame    = 0;
+    portConf.rxmode.hw_strip_crc   = 0;
+    portConf.txmode.mq_mode = ETH_MQ_TX_NONE;
+
+    if (ret = rte_eth_dev_configure(deviceId, DPDKPCAP_RX_QUEUE_NUMBER, DPDKPCAP_TX_QUEUE_NUMBER, &portConf) < 1)
     {
-        printf ("Could not configure the device %d", deviceId);
+        printf ("Could not configure the device %d, err %d", deviceId, ret);
         return DPDKPCAP_FAILURE;
     }
 
