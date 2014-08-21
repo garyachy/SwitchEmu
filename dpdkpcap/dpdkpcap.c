@@ -60,14 +60,14 @@ DpdkPcapResultCode_t globalInit()
         return DPDKPCAP_FAILURE;
     }
 
-#if RTE_VER_MAJOR == 1
-#if RTE_VER_MINOR < 7
+//#if RTE_VER_MAJOR == 1
+//#if RTE_VER_MINOR < 7
     if (rte_pmd_init_all() < 0)
     {
         return DPDKPCAP_FAILURE;
     }
-#endif
-#endif
+//#endif
+//#endif
     if (rte_eal_pci_probe() < 0)
     {
         return DPDKPCAP_FAILURE;
@@ -117,7 +117,7 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
     struct rte_eth_rxconf rxConf;
     struct rte_eth_txconf txConf;
     int queueId = 0;
-    int ret;
+    int ret = 0;
 
     memset(&portConf, 0, sizeof(portConf));
     memset(&rxConf, 0, sizeof(rxConf));
@@ -141,9 +141,9 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
     portConf.rxmode.hw_strip_crc   = 0;
     portConf.txmode.mq_mode = ETH_MQ_TX_NONE;
 
-    if (ret = rte_eth_dev_configure(deviceId, DPDKPCAP_RX_QUEUE_NUMBER, DPDKPCAP_TX_QUEUE_NUMBER, &portConf) < 1)
+    if (rte_eth_dev_configure(deviceId, DPDKPCAP_RX_QUEUE_NUMBER, DPDKPCAP_TX_QUEUE_NUMBER, &portConf) < 0)
     {
-        printf ("Could not configure the device %d, err %d", deviceId, ret);
+        printf ("Could not configure the device %d", deviceId);
         return DPDKPCAP_FAILURE;
     }
 
@@ -159,7 +159,7 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
 
     txConf.tx_thresh.pthresh = DPDKPCAP_TX_PTHRESH;
     txConf.tx_thresh.hthresh = DPDKPCAP_TX_HTHRESH;
-    txConf.tx_thresh.wthresh = DPDKPCAP_TX_WTHRESH_1GB;
+    txConf.tx_thresh.wthresh = DPDKPCAP_TX_WTHRESH;
 
     if (rte_eth_tx_queue_setup(deviceId, queueId, DPDKPCAP_TX_QUEUE_DESC_NUMBER, SOCKET_ID_ANY, &txConf) < 0)
     {
@@ -167,9 +167,10 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
         return DPDKPCAP_FAILURE;
     }
 
-    if (rte_eth_dev_start(deviceId) < 0)
+    ret = rte_eth_dev_start(deviceId);
+    if (ret < 0)
     {
-        printf ("Could not start the device %d", deviceId);
+        printf ("Could not start the device %d, err %d", deviceId, ret);
         return DPDKPCAP_FAILURE;
     }
 
