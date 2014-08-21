@@ -20,6 +20,7 @@ int main(int argc, char *argv[])
     if(pcap_findalldevs(&deviceList, errbuf) == -1)
     {
         printf("Error in pcap_findalldevs_ex: %s\n", errbuf);
+        return -1;
     }
 
     for(device = deviceList; device != NULL; device = device->next)

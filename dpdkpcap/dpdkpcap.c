@@ -36,6 +36,7 @@
 
 int initFinished = 0;
 int portInitFinished[RTE_MAX_ETHPORTS] = {0};
+rte_atomic16_t startRx = RTE_ATOMIC16_INIT(0);
 
 struct rte_mempool* rxPool = 0;
 #define DPDKPCAP_RX_POOL_NAME "RX_POOL"
@@ -47,29 +48,26 @@ struct rte_mempool* txPool = 0;
 
 DpdkPcapResultCode_t globalInit()
 {
-    char  arg0[] = "program";
-    char  arg1[] = "-c";
-    char  arg2[] = "0x03";
-    char  arg3[] = "-n";
-    char  arg4[] = "2";
-    char* argv[] = { &arg0[0], &arg1[0], &arg2[0], &arg3[0], &arg4[0], NULL };
-    int   argc   = (int)(sizeof(argv) / sizeof(argv[0])) - 1;
+    char *args[] = {"dpdkpcap_test", "-c0x03", "-n2", "-m128", "--file-prefix=dpdkpcap_test"};
 
     if (initFinished == 1)
     {
         return DPDKPCAP_OK;
     }
 
-    if (rte_eal_init(argc, argv) < 0)
+    if (rte_eal_init(sizeof(args)/sizeof(char*), args) < 0)
     {
         return DPDKPCAP_FAILURE;
     }
 
+#if RTE_VER_MAJOR == 1
+#if RTE_VER_MINOR < 7
     if (rte_pmd_init_all() < 0)
     {
         return DPDKPCAP_FAILURE;
     }
-
+#endif
+#endif
     if (rte_eal_pci_probe() < 0)
     {
         return DPDKPCAP_FAILURE;
@@ -105,7 +103,9 @@ DpdkPcapResultCode_t globalInit()
         return DPDKPCAP_FAILURE;
     }
 
-    printf ("Global init succedded");
+    rte_eal_mp_remote_launch(rxLoop, NULL, SKIP_MASTER);
+
+    startRxLoop();
 
     initFinished = 1;
     return DPDKPCAP_OK;
@@ -122,6 +122,11 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
     memset(&portConf, 0, sizeof(portConf));
     memset(&rxConf, 0, sizeof(rxConf));
     memset(&txConf, 0, sizeof(txConf));
+
+    if (initFinished == 0)
+    {
+        return DPDKPCAP_FAILURE;
+    }
 
     if (portInitFinished[deviceId] == 1)
     {
@@ -142,9 +147,9 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
         return DPDKPCAP_FAILURE;
     }
 
-    rxConf.rx_thresh.pthresh = 8;
-    rxConf.rx_thresh.hthresh = 8;
-    rxConf.rx_thresh.wthresh = 4;
+    rxConf.rx_thresh.pthresh = DPDKPCAP_RX_PTHRESH;
+    rxConf.rx_thresh.hthresh = DPDKPCAP_RX_HTHRESH;
+    rxConf.rx_thresh.wthresh = DPDKPCAP_RX_WTHRESH;
 
     if (rte_eth_rx_queue_setup(deviceId, queueId, DPDKPCAP_RX_QUEUE_DESC_NUMBER, SOCKET_ID_ANY, &rxConf, rxPool) < 0)
     {
@@ -152,9 +157,9 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
         return DPDKPCAP_FAILURE;
     }
 
-    txConf.tx_thresh.pthresh = 16;
-    txConf.tx_thresh.hthresh = 0;
-    txConf.tx_thresh.wthresh = 0;
+    txConf.tx_thresh.pthresh = DPDKPCAP_TX_PTHRESH;
+    txConf.tx_thresh.hthresh = DPDKPCAP_TX_HTHRESH;
+    txConf.tx_thresh.wthresh = DPDKPCAP_TX_WTHRESH_1GB;
 
     if (rte_eth_tx_queue_setup(deviceId, queueId, DPDKPCAP_TX_QUEUE_DESC_NUMBER, SOCKET_ID_ANY, &txConf) < 0)
     {
@@ -175,15 +180,39 @@ DpdkPcapResultCode_t deviceInit(int deviceId)
     return DPDKPCAP_OK;
 }
 
+DpdkPcapResultCode_t deviceDeInit(int deviceId)
+{
+    if (portInitFinished[deviceId] == 0)
+    {
+        return DPDKPCAP_FAILURE;
+    }
+
+    rte_eth_dev_stop(deviceId);
+
+    portInitFinished[deviceId] = 0;
+
+    return DPDKPCAP_OK;
+}
+
 pcap_t* pcap_open_live(const char *source, int snaplen, int promisc, int to_ms, char *errbuf)
 {
     pcap_t *p = NULL;
+
+    if (initFinished == 0)
+    {
+        return NULL;
+    }
 
     return p;
 }
 
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
+    if (initFinished == 0)
+    {
+        return DPDKPCAP_FAILURE;
+    }
+
     return DPDKPCAP_FAILURE;
 }
 
@@ -197,7 +226,11 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
     pcap_if_t *pPcapIf = NULL;
     struct rte_eth_dev_info info;
 
-    globalInit();
+    if (globalInit() != DPDKPCAP_OK)
+    {
+        snprintf (errbuf, PCAP_ERRBUF_SIZE, "Could not initialize DPDK");
+        return DPDKPCAP_FAILURE;
+    }
 
     int portsNumber = rte_eth_dev_count();
     if (portsNumber < 1)
@@ -213,7 +246,7 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
     {
         if (deviceInit(port) == DPDKPCAP_FAILURE)
         {
-            printf ("Could not initialize the port %d", port);
+            snprintf (errbuf, PCAP_ERRBUF_SIZE, "Could not initialize the port %d", port);
             return DPDKPCAP_FAILURE;
         }
 
@@ -227,11 +260,28 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
                  info.pci_dev->addr.devid);
     }
 
-    return DPDKPCAP_FAILURE;
+    return DPDKPCAP_OK;
 }
 
 void pcap_freealldevs(pcap_if_t *alldevs)
 {
+    int port = 0;
+    int portsNumber = rte_eth_dev_count();
+
+    if (initFinished == 0)
+    {
+        return;
+    }
+
+    if (portsNumber < 1)
+    {
+        return;
+    }
+
+    for (port = 0; port < portsNumber; port++)
+    {
+        deviceDeInit(port);
+    }
 }
 
 int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
@@ -270,4 +320,44 @@ int pcap_setdirection(pcap_t *p, pcap_direction_t d)
 
 void pcap_breakloop(pcap_t *p)
 {
+}
+
+DpdkPcapResultCode_t sendPacket(int deviceId, const u_char *buf, int size)
+{
+    struct rte_mbuf *mbuf = NULL;
+
+    if (initFinished == 0)
+    {
+        return DPDKPCAP_FAILURE;
+    }
+
+    mbuf = rte_pktmbuf_alloc(rxPool);
+
+    rte_memcpy(rte_pktmbuf_mtod(mbuf, char*), buf, size);
+
+    rte_eth_tx_burst(deviceId, 0, &mbuf, size);
+
+    return DPDKPCAP_FAILURE;
+}
+
+void startRxLoop()
+{
+    rte_atomic16_set(&startRx, 1);
+}
+
+void stopRxLoop()
+{
+    rte_atomic16_set(&startRx, 0);
+}
+
+int isRxLoopStarted()
+{
+    return (rte_atomic16_read(&startRx) == 1);
+}
+
+int rxLoop(void* arg)
+{
+    while(isRxLoopStarted())
+    {
+    }
 }
