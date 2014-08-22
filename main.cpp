@@ -25,27 +25,21 @@ int main(int argc, char *argv[])
 
     for(device = deviceList; device != NULL; device = device->next)
     {
-        printf("%s", device->name);
-        if (device->description)
-            printf(" : (%s)\n", device->description);
-        else
-            printf("\n");
+        printf("%s\n", device->name);
+
+        handle = pcap_open_live(device->name, BUFSIZ, 1, 1000, errbuf);
+        if (handle == NULL)
+        {
+            printf("Couldn't open device %s: %s\n", dev, errbuf);
+            return -1;
+        }
+
+        pcap_close(handle);
     }
+
+    //pcap_loop(handle, -1, my_callback, NULL);
 
     pcap_freealldevs(deviceList);
-
-    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-    if (handle == NULL)
-    {
-        fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
-        return(2);
-    }
-
-    printf("Opened device: %s\n", dev);
-
-    pcap_loop(handle, -1, my_callback, NULL);
-
-    pcap_close(handle);
 
     return(0);
 }
