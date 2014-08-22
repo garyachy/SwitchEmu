@@ -18,6 +18,11 @@ enum {
     DPDKPCAP_TX_WTHRESH_1GB             = 16	/**< Default value for 1GB ports */
 };
 
+struct pcap
+{
+    int deviceId;
+};
+
 void startRxLoop();
 void stopRxLoop();
 int isRxLoopStarted();

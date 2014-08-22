@@ -28,6 +28,8 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
+#define VER_16
+
 #define DPDKPCAP_MBUF_SIZE       (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 #define DPDKPCAP_NB_MBUF         512
 #define DPDKPCAP_CACHE_SIZE      32
@@ -210,7 +212,7 @@ pcap_t* pcap_open_live(const char *source, int snaplen, int promisc, int to_ms, 
     pcap_t *p = NULL;
     int deviceId = 0;
 
-    printf("Openning device %s\n", source);
+    printf("Opening device %s\n", source);
 
     if (initFinished == 0)
     {
@@ -237,6 +239,7 @@ pcap_t* pcap_open_live(const char *source, int snaplen, int promisc, int to_ms, 
     }
 
     p = malloc (sizeof(pcap_t));
+    p->deviceId = deviceId;
 
     return p;
 }
@@ -253,6 +256,12 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 
 void pcap_close(pcap_t *p)
 {
+    char *deviceName = NULL;
+
+    deviceName = deviceNames[p->deviceId];
+    printf("Closing device %s\n", deviceName);
+
+    rte_eth_dev_stop(p->deviceId);
 }
 
 int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
@@ -330,7 +339,24 @@ void pcap_freealldevs(pcap_if_t *alldevs)
 
 int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
 {
-    return DPDKPCAP_FAILURE;
+    int ret = 0;
+    struct rte_mbuf* mbuf = NULL;
+
+    mbuf = rte_pktmbuf_alloc(rxPool);
+
+    rte_memcpy(rte_pktmbuf_mtod(mbuf, char*), buf, size);
+
+    printf("Sending a packet to port %d\n", p->deviceId);
+
+    ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
+    if (ret < 1)
+    {
+        printf("rte_eth_tx_burst failed on port %d\n", p->deviceId);
+        rte_pktmbuf_free(mbuf);
+        return DPDKPCAP_FAILURE;
+    }
+
+    return DPDKPCAP_OK;
 }
 
 pcap_dumper_t * pcap_dump_open(pcap_t *p, const char *fname)
@@ -341,7 +367,25 @@ pcap_dumper_t * pcap_dump_open(pcap_t *p, const char *fname)
 int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
     const u_char **pkt_data)
 {
-    return DPDKPCAP_FAILURE;
+    int ret = 0;
+    struct rte_mbuf* mbuf = NULL;
+
+    printf("Receiving a packet on port %d\n", p->deviceId);
+
+    ret = rte_eth_rx_burst(p->deviceId, 0, &mbuf, 1);
+    if (ret < 1)
+    {
+        printf("rte_eth_rx_burst failed on port %d\n", p->deviceId);
+        return DPDKPCAP_FAILURE;
+    }
+
+    *pkt_data = malloc (100);
+
+    rte_memcpy((void*)*pkt_data, rte_pktmbuf_mtod(mbuf, void*), 100);
+
+    rte_pktmbuf_free(mbuf);
+
+    return DPDKPCAP_OK;
 }
 
 void pcap_dump(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
