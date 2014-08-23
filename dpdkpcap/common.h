@@ -23,9 +23,4 @@ struct pcap
     int deviceId;
 };
 
-void startRxLoop();
-void stopRxLoop();
-int isRxLoopStarted();
-int rxLoop(void* arg);
-
 #endif // COMMON_H

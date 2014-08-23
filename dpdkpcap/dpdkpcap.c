@@ -39,7 +39,6 @@
 
 int initFinished = 0;
 int portInitFinished[RTE_MAX_ETHPORTS] = {0};
-rte_atomic16_t startRx = RTE_ATOMIC16_INIT(0);
 
 struct rte_mempool* rxPool = 0;
 #define DPDKPCAP_RX_POOL_NAME "RX_POOL"
@@ -408,44 +407,4 @@ int pcap_setdirection(pcap_t *p, pcap_direction_t d)
 
 void pcap_breakloop(pcap_t *p)
 {
-}
-
-DpdkPcapResultCode_t sendPacket(int deviceId, const u_char *buf, int size)
-{
-    struct rte_mbuf *mbuf = NULL;
-
-    if (initFinished == 0)
-    {
-        return DPDKPCAP_FAILURE;
-    }
-
-    mbuf = rte_pktmbuf_alloc(rxPool);
-
-    rte_memcpy(rte_pktmbuf_mtod(mbuf, char*), buf, size);
-
-    rte_eth_tx_burst(deviceId, 0, &mbuf, size);
-
-    return DPDKPCAP_FAILURE;
-}
-
-void startRxLoop()
-{
-    rte_atomic16_set(&startRx, 1);
-}
-
-void stopRxLoop()
-{
-    rte_atomic16_set(&startRx, 0);
-}
-
-int isRxLoopStarted()
-{
-    return (rte_atomic16_read(&startRx) == 1);
-}
-
-int rxLoop(void* arg)
-{
-    while(isRxLoopStarted())
-    {
-    }
 }
