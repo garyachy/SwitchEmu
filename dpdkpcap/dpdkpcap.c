@@ -37,6 +37,8 @@
 #define DPDKPCAP_TX_QUEUE_NUMBER 1
 #define DPDKPCAP_IF_NAMESIZE     16
 
+#define PACKET_COUNT_IS_UNLIMITED(count)	((count) <= 0)
+
 int initFinished = 0;
 int portInitFinished[RTE_MAX_ETHPORTS] = {0};
 
@@ -245,9 +247,28 @@ pcap_t* pcap_open_live(const char *source, int snaplen, int promisc, int to_ms, 
 
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
+    struct pcap_pkthdr *header  = NULL;
+    const u_char *pktdata = NULL;
+    int ret = 0;
+
     if (initFinished == 0)
     {
         return DPDKPCAP_FAILURE;
+    }
+
+    for (;;)
+    {
+        ret = pcap_next_ex(p, &header, &pktdata);
+        if (ret == 1)
+        {
+            callback(user, header, pktdata);
+        }
+
+        if (!PACKET_COUNT_IS_UNLIMITED(cnt)) {
+            cnt -= ret;
+            if (cnt <= 0)
+                return DPDKPCAP_OK;
+        }
     }
 
     return DPDKPCAP_FAILURE;
@@ -377,6 +398,8 @@ int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
         printf("rte_eth_rx_burst failed on port %d\n", p->deviceId);
         return DPDKPCAP_FAILURE;
     }
+
+// TBD : release previous allocation
 
     *pkt_data = malloc (100);
 

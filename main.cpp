@@ -12,7 +12,6 @@ int main(int argc, char *argv[])
     pcap_pkthdr *header = NULL;
     const u_char *pktdata = NULL;
 
-    char *dev = argv[1];
     char errbuf[PCAP_ERRBUF_SIZE];
 
     pcap_if_t *deviceList;
@@ -55,7 +54,7 @@ int main(int argc, char *argv[])
         handle = pcap_open_live(device->name, BUFSIZ, 1, 1000, errbuf);
         if (handle == NULL)
         {
-            printf("Couldn't open device %s: %s\n", dev, errbuf);
+            printf("Couldn't open device %s: %s\n", device->name, errbuf);
             return -1;
         }
 
@@ -70,18 +69,17 @@ int main(int argc, char *argv[])
         }
         else
         {
-            if (pcap_next_ex(handle, &header, &pktdata) < 0)
+            /*if (pcap_next_ex(handle, &header, &pktdata) < 0)
             {
                 printf("pcap_next_ex failed");
                 return -1;
-            }
-            printf("Received a buffer %s\n", pktdata);
+            }*/
+            pcap_loop(handle, 10, my_callback, NULL);
+            //printf("Received a buffer %s\n", pktdata);
         }
 
         pcap_close(handle);
     }
-
-    //pcap_loop(handle, -1, my_callback, NULL);
 
     pcap_freealldevs(deviceList);
 
