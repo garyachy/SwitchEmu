@@ -52,6 +52,26 @@ struct rte_mempool* txPool = 0;
 
 char* deviceNames[RTE_MAX_ETHPORTS] = {NULL};
 
+void print_rx_stats(int deviceId)
+{
+    struct rte_eth_stats stats;
+
+    rte_eth_stats_get(deviceId, &stats);
+
+    printf("\nRX port %hu: rx: %"PRIu64 " err: %"PRIu64 " no_mbuf: %"PRIu64 "\n",
+           deviceId, stats.ipackets, stats.ierrors, stats.rx_nombuf);
+}
+
+void print_tx_stats(int deviceId)
+{
+    struct rte_eth_stats stats;
+
+    rte_eth_stats_get(deviceId, &stats);
+
+    printf("\nTX port %hu: tx: %"PRIu64 " err: %"PRIu64 "\n",
+           deviceId, stats.opackets, stats.oerrors);
+}
+
 DpdkPcapResultCode_t globalInit(char *errbuf)
 {
     char *args[] = {"dpdkpcap_test", "-c 0x03", "-n 2", "-m 128", "--file-prefix=dpdkpcap_test"};
@@ -123,7 +143,6 @@ DpdkPcapResultCode_t deviceInit(int deviceId, char *errbuf)
     struct rte_eth_rxconf rxConf;
     struct rte_eth_txconf txConf;
     int queueId = 0;
-    int ret = 0;
 
     memset(&portConf, 0, sizeof(portConf));
     memset(&rxConf, 0, sizeof(rxConf));
@@ -278,6 +297,13 @@ void pcap_close(pcap_t *p)
 {
     char *deviceName = NULL;
 
+    if (p == NULL || p->deviceId < 0 ||
+        p->deviceId > RTE_MAX_ETHPORTS)
+    {
+        printf("Invalid parameter");
+        return;
+    }
+
     deviceName = deviceNames[p->deviceId];
     printf("Closing device %s\n", deviceName);
 
@@ -362,19 +388,40 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
     int ret = 0;
     struct rte_mbuf* mbuf = NULL;
 
-    mbuf = rte_pktmbuf_alloc(rxPool);
+    if (p == NULL || buf == NULL ||
+        p->deviceId < 0 || p->deviceId > RTE_MAX_ETHPORTS)
+    {
+        printf("Invalid parameter");
+        return DPDKPCAP_FAILURE;
+    }
+
+    print_tx_stats(p->deviceId);
+
+    mbuf = rte_pktmbuf_alloc(txPool);
+    if (mbuf == NULL)
+    {
+        printf("rte_pktmbuf_alloc failed on port %d\n", p->deviceId);
+    }
+
+    if (mbuf->buf_len < size)
+    {
+        printf("Can not copy packet data : packet size %d, mbuf length %d, port %d\n",
+               size, mbuf->buf_len, p->deviceId);
+        return DPDKPCAP_FAILURE;
+    }
 
     rte_memcpy(rte_pktmbuf_mtod(mbuf, char*), buf, size);
 
-    printf("Sending a packet to port %d\n", p->deviceId);
-
     ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
+    printf("ret = %d\n", ret);
     if (ret < 1)
     {
         printf("rte_eth_tx_burst failed on port %d\n", p->deviceId);
         rte_pktmbuf_free(mbuf);
         return DPDKPCAP_FAILURE;
     }
+
+    printf("Sent a packet to port %d\n", p->deviceId);
 
     return DPDKPCAP_OK;
 }
@@ -387,23 +434,36 @@ pcap_dumper_t * pcap_dump_open(pcap_t *p, const char *fname)
 int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
     const u_char **pkt_data)
 {
-    int ret = 0;
     struct rte_mbuf* mbuf = NULL;
+    int              len  = 0;
+
+    if (p == NULL || pkt_header == NULL || pkt_data == NULL ||
+        p->deviceId < 0 || p->deviceId > RTE_MAX_ETHPORTS)
+    {
+        printf("Invalid parameter");
+        return DPDKPCAP_FAILURE;
+    }
+
+    print_rx_stats(p->deviceId);
 
     printf("Receiving a packet on port %d\n", p->deviceId);
 
-    ret = rte_eth_rx_burst(p->deviceId, 0, &mbuf, 1);
-    if (ret < 1)
+    while (!rte_eth_rx_burst(p->deviceId, 0, &mbuf, 1))
     {
-        printf("rte_eth_rx_burst failed on port %d\n", p->deviceId);
-        return DPDKPCAP_FAILURE;
     }
 
 // TBD : release previous allocation
 
-    *pkt_data = malloc (100);
+    len = rte_pktmbuf_pkt_len(mbuf);
 
-    rte_memcpy((void*)*pkt_data, rte_pktmbuf_mtod(mbuf, void*), 100);
+    printf ("len = %d\n", len);
+
+    *pkt_data = malloc (len);
+
+    *pkt_header = malloc(sizeof(struct pcap_pkthdr));
+    (*pkt_header)->len = len;
+
+    rte_memcpy((void*)*pkt_data, rte_pktmbuf_mtod(mbuf, void*), len);
 
     rte_pktmbuf_free(mbuf);
 
