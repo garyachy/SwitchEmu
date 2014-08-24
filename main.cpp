@@ -71,22 +71,22 @@ int main(int argc, char *argv[])
 
     for (i = 0; i < 10; i++)
     {
-        /*printf("Sending a packet %d\n", i + 1);
+        printf("Sending a packet %d\n", i + 1);
 
         if (pcap_sendpacket(handles[0], packet, sizeof(packet)) < 0)
         {
             printf("pcap_sendpacket failed\n");
             return -1;
-        }*/
+        }
 
         printf("Receiving a packet %d\n", i + 1);
 
-        if (pcap_next_ex(handles[0], &header, &pktdata) < 0)
+        if (pcap_next_ex(handles[1], &header, &pktdata) < 0)
         {
             printf("pcap_next_ex failed\n");
             continue;
         }
-        //pcap_loop(handle, -1, my_callback, NULL);
+
         printf("Received a buffer of length %d\n", header->len);
     }
 

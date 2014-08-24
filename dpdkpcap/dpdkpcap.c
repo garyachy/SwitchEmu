@@ -52,6 +52,9 @@ struct rte_mempool* txPool = 0;
 
 char* deviceNames[RTE_MAX_ETHPORTS] = {NULL};
 
+static u_char data_g[10000];
+static struct pcap_pkthdr pktHeader_g;
+
 void print_rx_stats(int deviceId)
 {
     struct rte_eth_stats stats;
@@ -395,8 +398,6 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
         return DPDKPCAP_FAILURE;
     }
 
-    print_tx_stats(p->deviceId);
-
     mbuf = rte_pktmbuf_alloc(txPool);
     if (mbuf == NULL)
     {
@@ -410,7 +411,10 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
         return DPDKPCAP_FAILURE;
     }
 
-    rte_memcpy(rte_pktmbuf_mtod(mbuf, char*), buf, size);
+    rte_memcpy(mbuf->pkt.data, buf, size);
+    mbuf->pkt.data_len = size;
+
+    rte_pktmbuf_dump(mbuf, 0);
 
     ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
     printf("ret = %d\n", ret);
@@ -422,6 +426,8 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
     }
 
     printf("Sent a packet to port %d\n", p->deviceId);
+
+    print_tx_stats(p->deviceId);
 
     return DPDKPCAP_OK;
 }
@@ -444,28 +450,23 @@ int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
         return DPDKPCAP_FAILURE;
     }
 
-    print_rx_stats(p->deviceId);
-
     printf("Receiving a packet on port %d\n", p->deviceId);
 
     while (!rte_eth_rx_burst(p->deviceId, 0, &mbuf, 1))
     {
     }
 
-// TBD : release previous allocation
-
     len = rte_pktmbuf_pkt_len(mbuf);
 
-    printf ("len = %d\n", len);
+    pktHeader_g.len = len;
+    *pkt_header = &pktHeader_g;
 
-    *pkt_data = malloc (len);
-
-    *pkt_header = malloc(sizeof(struct pcap_pkthdr));
-    (*pkt_header)->len = len;
-
-    rte_memcpy((void*)*pkt_data, rte_pktmbuf_mtod(mbuf, void*), len);
+    rte_memcpy((void*)data_g, rte_pktmbuf_mtod(mbuf, void*), len);
+    *pkt_data = data_g;
 
     rte_pktmbuf_free(mbuf);
+
+    print_rx_stats(p->deviceId);
 
     return DPDKPCAP_OK;
 }
