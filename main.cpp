@@ -1,16 +1,43 @@
 #include <stdio.h>
 #include <pcap.h>
+#include <time.h>
+
+#ifdef DEBUG
+#define debug printf
+#else
+#define debug
+#endif
 
 #define PACKET_SIZE 100
 
-#define TX_HANDLE 3
-#define RX_HANDLE 4
+#define TX_HANDLE 0
+#define RX_HANDLE 1
+
 #define HANDLE_NUM 10
-#define REPEAT_NUM 10
+#define REPEAT_NUM 1000
+
+time_t start, end;
+
+void start_timer()
+{
+    time (&start);
+}
+
+void stop_timer()
+{
+    time (&end);
+}
+
+void print_rates(int pktCount, int pktSize)
+{
+    double diff = difftime (end, start);
+    printf ("Sent/received %d packets of size %d per %.2lf seconds\n", pktCount, pktSize, diff);
+    printf ("Rate is %.2lf pps or %.2lf bps\n", pktCount/diff, (pktCount * pktSize * 8)/diff);
+}
 
 void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char*packet)
 {
-   printf("Received a packet of length %d \n", pkthdr->len);
+   debug("Received a packet of length %d \n", pkthdr->len);
 }
 
 int createPacket(u_char* packet)
@@ -57,7 +84,7 @@ int test1()
 
     createPacket(packet);
 
-    printf("Retrieving the device list from the local machine\n");
+    debug("Retrieving the device list from the local machine\n");
 
     if(pcap_findalldevs(&deviceList, errbuf) < 0)
     {
@@ -69,7 +96,7 @@ int test1()
 
     for(device = deviceList; device != NULL; device = device->next)
     {
-        printf("%s\n", device->name);
+        debug("%s\n", device->name);
 
         handles[i] = pcap_open_live(device->name, BUFSIZ, 1, 1000, errbuf);
         if (handles[i] == NULL)
@@ -81,26 +108,31 @@ int test1()
         i++;
     }
 
+    start_timer();
+
     for (i = 0; i < REPEAT_NUM; i++)
     {
-        printf("Sending a packet %d\n", i + 1);
+        debug("Sending a packet %d\n", i + 1);
 
         if (pcap_sendpacket(handles[TX_HANDLE], packet, sizeof(packet)) < 0)
         {
-            printf("pcap_sendpacket failed\n");
+            printf("pcap_sendpacket failed : %s\n", pcap_geterr(handles[TX_HANDLE]));
             return -1;
         }
 
-        printf("Receiving a packet %d\n", i + 1);
+        debug("Receiving a packet %d\n", i + 1);
 
         if (pcap_next_ex(handles[RX_HANDLE], &header, &pktdata) < 0)
         {
-            printf("pcap_next_ex failed\n");
+            printf("pcap_next_ex failed : %s\n", pcap_geterr(handles[RX_HANDLE]));
             continue;
         }
 
-        printf("Received a buffer of length %d\n", header->len);
+        debug("Received a buffer of length %d\n", header->len);
     }
+
+    stop_timer();
+    print_rates(REPEAT_NUM, PACKET_SIZE);
 
     for(i = 0; i < 2; i++)
     {
@@ -115,8 +147,6 @@ int test1()
 int test2()
 {
     pcap_t *handles[HANDLE_NUM];
-    pcap_pkthdr *header = NULL;
-    const u_char *pktdata = NULL;
 
     char errbuf[PCAP_ERRBUF_SIZE];
 
@@ -128,7 +158,7 @@ int test2()
 
     createPacket(packet);
 
-    printf("Retrieving the device list from the local machine\n");
+    debug("Retrieving the device list from the local machine\n");
 
     if(pcap_findalldevs(&deviceList, errbuf) < 0)
     {
@@ -140,7 +170,7 @@ int test2()
 
     for(device = deviceList; device != NULL; device = device->next)
     {
-        printf("%s\n", device->name);
+        debug("%s\n", device->name);
 
         handles[i] = pcap_open_live(device->name, BUFSIZ, 1, 1000, errbuf);
         if (handles[i] == NULL)
@@ -154,15 +184,15 @@ int test2()
 
     for (i = 0; i < REPEAT_NUM; i++)
     {
-        printf("Sending a packet %d\n", i + 1);
+        debug("Sending a packet %d\n", i + 1);
 
         if (pcap_sendpacket(handles[TX_HANDLE], packet, sizeof(packet)) < 0)
         {
-            printf("pcap_sendpacket failed\n");
+            printf("pcap_sendpacket failed : %s\n", pcap_geterr(handles[TX_HANDLE]));
             return -1;
         }
 
-        printf("Receiving a packet %d\n", i + 1);
+        debug("Receiving a packet %d\n", i + 1);
 
         if (pcap_loop(handles[RX_HANDLE], 1, my_callback, NULL) < 0)
         {
@@ -184,7 +214,7 @@ int test2()
 int main(int argc, char *argv[])
 {
     (test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
-    (test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
+    //(test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
 
     return(0);
 }
