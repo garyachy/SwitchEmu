@@ -50,9 +50,13 @@ struct rte_mempool* txPool = 0;
 #define DPDKPCAP_TX_POOL_NAME "TX_POOL"
 #define DPDKPCAP_TX_QUEUE_DESC_NUMBER 128
 
+#define DEVICE_NAME_SIZE 16
+
 char* deviceNames[RTE_MAX_ETHPORTS] = {NULL};
 
-static u_char data_g[10000];
+#define PACKET_SIZE 10000
+
+static u_char data_g[PACKET_SIZE];
 static struct pcap_pkthdr pktHeader_g;
 
 void print_rx_stats(int deviceId)
@@ -221,8 +225,7 @@ int findDevice(const char *source, char *errbuf)
 
     for (i = 0; i < sizeof(deviceNames); i++)
     {
-// TBD replace hard-coded name size
-        if (strncmp(source, deviceNames[i], 16) == 0)
+        if (strncmp(source, deviceNames[i], DEVICE_NAME_SIZE) == 0)
             return i;
     }
 
@@ -286,7 +289,8 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             callback(user, header, pktdata);
         }
 
-        if (!PACKET_COUNT_IS_UNLIMITED(cnt)) {
+        if (!PACKET_COUNT_IS_UNLIMITED(cnt))
+        {
             cnt -= ret;
             if (cnt <= 0)
                 return DPDKPCAP_OK;
@@ -328,6 +332,7 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
     int portsNumber = rte_eth_dev_count();
     if (portsNumber < 1)
     {
+        snprintf (errbuf, PCAP_ERRBUF_SIZE, "No devices found");
         return DPDKPCAP_FAILURE;
     }
 
@@ -468,7 +473,7 @@ int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
 
     print_rx_stats(p->deviceId);
 
-    return DPDKPCAP_OK;
+    return 1;
 }
 
 void pcap_dump(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
