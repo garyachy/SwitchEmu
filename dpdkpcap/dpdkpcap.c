@@ -34,6 +34,7 @@
 #define debug
 #endif
 
+static const char pcap_version_string[] = "dpdk pcap version 0.1";
 static char errbuf_g[PCAP_ERRBUF_SIZE];
 
 #define VER_16
@@ -592,4 +593,9 @@ int pcap_setdirection(pcap_t *p, pcap_direction_t d)
 
 void pcap_breakloop(pcap_t *p)
 {
+}
+
+const char *pcap_lib_version(void)
+{
+    return pcap_version_string;
 }
