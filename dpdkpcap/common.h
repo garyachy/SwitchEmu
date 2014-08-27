@@ -23,4 +23,16 @@ struct pcap
     int deviceId;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int linkStatusGet(const char* device);
+int rxStatsGet(pcap_t *p);
+int txStatsGet(pcap_t *p);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif // COMMON_H

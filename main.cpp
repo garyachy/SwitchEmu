@@ -1,6 +1,10 @@
 #include <stdio.h>
+#include <string.h>
 #include <pcap.h>
 #include <time.h>
+#include "common.h"
+
+//#define DEBUG
 
 #ifdef DEBUG
 #define debug printf
@@ -14,7 +18,7 @@
 #define RX_HANDLE 1
 
 #define HANDLE_NUM 10
-#define REPEAT_NUM 1000
+#define REPEAT_NUM 10
 
 time_t start, end;
 
@@ -81,6 +85,11 @@ int test1()
 
     u_char packet[PACKET_SIZE];
     int i = 0;
+    int status = 0;
+    int rxPackets = 0;
+    int txPackets = 0;
+
+    memset(handles, 0, sizeof(handles));
 
     createPacket(packet);
 
@@ -104,6 +113,12 @@ int test1()
             printf("Couldn't open device %s: %s\n", device->name, errbuf);
             return -1;
         }
+
+        status = linkStatusGet(device->name);
+        if (status)
+            printf("Link is UP on device %s\n", device->name);
+        else
+            printf("Link is DOWN on device %s\n", device->name);
 
         i++;
     }
@@ -134,8 +149,21 @@ int test1()
     stop_timer();
     print_rates(REPEAT_NUM, PACKET_SIZE);
 
-    for(i = 0; i < 2; i++)
+    for(i = 0; i < HANDLE_NUM; i++)
     {
+        if (handles[i] == 0)
+            continue;
+
+        rxPackets = rxStatsGet(handles[i]);
+        if (rxPackets < 0)
+            continue;
+
+        txPackets = txStatsGet(handles[i]);
+        if (txPackets < 0)
+            continue;
+
+        printf("%d : RX : %d, TX : %d \n", i, rxPackets, txPackets);
+
         pcap_close(handles[i]);
     }
 
@@ -155,6 +183,8 @@ int test2()
 
     u_char packet[PACKET_SIZE];
     int i = 0;
+
+    memset(handles, 0, sizeof(handles));
 
     createPacket(packet);
 
@@ -201,8 +231,11 @@ int test2()
         }
     }
 
-    for(i = 0; i < 2; i++)
+    for(i = 0; i < HANDLE_NUM; i++)
     {
+        if (handles[i] == 0)
+            continue;
+
         pcap_close(handles[i]);
     }
 
@@ -214,7 +247,7 @@ int test2()
 int main(int argc, char *argv[])
 {
     (test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
-    //(test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
+   // (test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
 
     return(0);
 }

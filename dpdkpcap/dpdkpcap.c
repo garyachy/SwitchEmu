@@ -67,24 +67,79 @@ char* deviceNames[RTE_MAX_ETHPORTS] = {NULL};
 static u_char data_g[PACKET_SIZE];
 static struct pcap_pkthdr pktHeader_g;
 
-void print_rx_stats(int deviceId)
+int linkStatusGet(const char* device)
 {
-    struct rte_eth_stats stats;
+    int deviceId = 0;
+    struct rte_eth_link link;
 
-    rte_eth_stats_get(deviceId, &stats);
+    if (device == NULL)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Invalid parameter");
+        return DPDKPCAP_FAILURE;
+    }
 
-    debug("\nRX port %hu: rx: %"PRIu64 " err: %"PRIu64 " no_mbuf: %"PRIu64 "\n",
-           deviceId, stats.ipackets, stats.ierrors, stats.rx_nombuf);
+    deviceId = findDevice(device, errbuf_g);
+
+    rte_eth_link_get_nowait(deviceId, &link);
+
+    return link.link_status;
 }
 
-void print_tx_stats(int deviceId)
+static void
+lsi_event_callback(uint8_t port_id, enum rte_eth_event_type type, void *param)
+{
+    struct rte_eth_link link;
+
+    RTE_SET_USED(param);
+
+    printf("\n\nIn registered callback...\n");
+    printf("Event type: %s\n", type == RTE_ETH_EVENT_INTR_LSC ? "LSC interrupt" : "unknown event");
+    rte_eth_link_get_nowait(port_id, &link);
+    if (link.link_status) {
+        printf("Port %d Link Up - speed %u Mbps - %s\n\n",
+                port_id, (unsigned)link.link_speed,
+            (link.link_duplex == ETH_LINK_FULL_DUPLEX) ?
+                ("full-duplex") : ("half-duplex"));
+    } else
+        printf("Port %d Link Down\n\n", port_id);
+}
+
+int rxStatsGet(pcap_t *p)
 {
     struct rte_eth_stats stats;
 
-    rte_eth_stats_get(deviceId, &stats);
+    if (p == NULL || p->deviceId < 0 ||
+        p->deviceId > RTE_MAX_ETHPORTS)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Invalid parameter");
+        return DPDKPCAP_FAILURE;
+    }
+
+    rte_eth_stats_get(p->deviceId, &stats);
+
+    debug("\nRX port %hu: rx: %"PRIu64 " err: %"PRIu64 " no_mbuf: %"PRIu64 "\n",
+           p->deviceId, stats.ipackets, stats.ierrors, stats.rx_nombuf);
+
+    return stats.ipackets;
+}
+
+int txStatsGet(pcap_t *p)
+{
+    struct rte_eth_stats stats;
+
+    if (p == NULL || p->deviceId < 0 ||
+        p->deviceId > RTE_MAX_ETHPORTS)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Invalid parameter");
+        return DPDKPCAP_FAILURE;
+    }
+
+    rte_eth_stats_get(p->deviceId, &stats);
 
     debug("\nTX port %hu: tx: %"PRIu64 " err: %"PRIu64 "\n",
-           deviceId, stats.opackets, stats.oerrors);
+           p->deviceId, stats.opackets, stats.oerrors);
+
+    return stats.opackets;
 }
 
 DpdkPcapResultCode_t globalInit(char *errbuf)
@@ -187,6 +242,8 @@ DpdkPcapResultCode_t deviceInit(int deviceId, char *errbuf)
         snprintf (errbuf, PCAP_ERRBUF_SIZE, "Could not configure the device %d", deviceId);
         return DPDKPCAP_FAILURE;
     }
+
+    rte_eth_dev_callback_register(deviceId, RTE_ETH_EVENT_INTR_LSC, lsi_event_callback, NULL);
 
     rxConf.rx_thresh.pthresh = DPDKPCAP_RX_PTHRESH;
     rxConf.rx_thresh.hthresh = DPDKPCAP_RX_HTHRESH;
@@ -442,8 +499,6 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
 
     debug("Sent a packet to port %d\n", p->deviceId);
 
-    print_tx_stats(p->deviceId);
-
     return DPDKPCAP_OK;
 }
 
@@ -481,8 +536,6 @@ int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
 
     rte_pktmbuf_free(mbuf);
 
-    print_rx_stats(p->deviceId);
-
     return 1;
 }
 
@@ -501,7 +554,7 @@ void pcap_dump_close(pcap_dumper_t *p)
 
 int pcap_setdirection(pcap_t *p, pcap_direction_t d)
 {
-    return DPDKPCAP_FAILURE;
+    return DPDKPCAP_OK;
 }
 
 void pcap_breakloop(pcap_t *p)
