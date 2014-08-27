@@ -244,10 +244,26 @@ int test2()
     return 0;
 }
 
+int test3()
+{
+    char errbuf[PCAP_ERRBUF_SIZE];
+    char *device = NULL;
+
+    if ( (device = pcap_lookupdev(errbuf)) == NULL)
+    {
+        return -1;
+    }
+
+    printf("Found a device %s\n", device);
+
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     (test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
-   // (test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
+    (test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
+    (test3() == 0) ? printf("Test 3 - OK\n") : printf("Test 3 - FAILED\n");
 
     return(0);
 }

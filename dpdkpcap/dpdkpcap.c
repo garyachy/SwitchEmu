@@ -45,6 +45,8 @@ static char errbuf_g[PCAP_ERRBUF_SIZE];
 #define DPDKPCAP_TX_QUEUE_NUMBER 1
 #define DPDKPCAP_IF_NAMESIZE     16
 
+static char ifName [DPDKPCAP_IF_NAMESIZE];
+
 #define PACKET_COUNT_IS_UNLIMITED(count)	((count) <= 0)
 
 int initFinished = 0;
@@ -380,6 +382,37 @@ void pcap_close(pcap_t *p)
     debug("Closing device %s\n", deviceName);
 
     rte_eth_dev_stop(p->deviceId);
+}
+
+char* pcap_lookupdev(char* errbuf)
+{
+    int    port  = 0;
+    struct rte_eth_dev_info info;
+
+    if (globalInit(errbuf) != DPDKPCAP_OK)
+    {
+        return NULL;
+    }
+
+    int portsNumber = rte_eth_dev_count();
+    if (portsNumber < 1)
+    {
+        snprintf (errbuf, PCAP_ERRBUF_SIZE, "No devices found");
+        return NULL;
+    }
+
+    if (deviceInit(port, errbuf) == DPDKPCAP_FAILURE)
+    {
+        return NULL;
+    }
+
+    rte_eth_dev_info_get(port, &info);
+
+    snprintf(ifName, DPDKPCAP_IF_NAMESIZE, "enp%us%u",
+             info.pci_dev->addr.bus,
+             info.pci_dev->addr.devid);
+
+    return ifName;
 }
 
 int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
