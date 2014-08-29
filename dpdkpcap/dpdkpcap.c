@@ -28,6 +28,8 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
+//#define DEBUG
+
 #ifdef DEBUG
 #define debug printf
 #else
@@ -333,6 +335,8 @@ pcap_t* pcap_open_live(const char *source, int snaplen, int promisc, int to_ms, 
     }
 
     p = malloc (sizeof(pcap_t));
+    memset(p, 0, sizeof(pcap_t));
+
     p->deviceId = deviceId;
 
     return p;
@@ -388,6 +392,8 @@ void pcap_close(pcap_t *p)
     debug("Closing device %s\n", deviceName);
 
     rte_eth_dev_stop(p->deviceId);
+
+    free(p);
 }
 
 char* pcap_lookupdev(char* errbuf)
@@ -452,6 +458,7 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
         }
 
         pPcapIf = malloc(sizeof(pcap_if_t));
+        memset(pPcapIf, 0, sizeof(pcap_if_t));
 
         if (pPcapPrevious)
             pPcapPrevious->next = pPcapIf;
@@ -463,11 +470,18 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
         rte_eth_dev_info_get(port, &info);
 
         pPcapIf->name = malloc(DPDKPCAP_IF_NAMESIZE);
+        memset(pPcapIf->name, 0, DPDKPCAP_IF_NAMESIZE);
+
         snprintf(pPcapIf->name, DPDKPCAP_IF_NAMESIZE, "enp%us%u",
                  info.pci_dev->addr.bus,
                  info.pci_dev->addr.devid);
 
         deviceNames[port] = pPcapIf->name;
+
+        pPcapIf->description = malloc(DPDKPCAP_IF_NAMESIZE);
+        memset(pPcapIf->description, 0, DPDKPCAP_IF_NAMESIZE);
+
+        snprintf(pPcapIf->description, DPDKPCAP_IF_NAMESIZE, "DPDK interface");
 
         printf("Allocating memory for %s\n", pPcapIf->name);
     }
@@ -491,6 +505,7 @@ void pcap_freealldevs(pcap_if_t *alldevs)
     {
         debug("Releasing memory for %s\n", device->name);
         free(device->name);
+        free(device->description);
 
         nextDevice = device->next;
         free(device);
