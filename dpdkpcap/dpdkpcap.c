@@ -338,6 +338,11 @@ pcap_t* pcap_open_live(const char *source, int snaplen, int promisc, int to_ms, 
     return p;
 }
 
+int pcap_dispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
+{
+    return pcap_loop(p, cnt, callback, user);
+}
+
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     struct pcap_pkthdr *header  = NULL;
@@ -412,6 +417,8 @@ char* pcap_lookupdev(char* errbuf)
     snprintf(ifName, DPDKPCAP_IF_NAMESIZE, "enp%us%u",
              info.pci_dev->addr.bus,
              info.pci_dev->addr.devid);
+
+    deviceNames[port] = ifName;
 
     return ifName;
 }
@@ -599,3 +606,95 @@ const char *pcap_lib_version(void)
 {
     return pcap_version_string;
 }
+
+int pcap_setnonblock(pcap_t *p, int nonblock, char *errbuf)
+{
+    return DPDKPCAP_OK;
+}
+
+int pcap_getnonblock(pcap_t *p, char *errbuf)
+{
+    return DPDKPCAP_OK;
+}
+
+int pcap_fileno(pcap_t *p)
+{
+    return DPDKPCAP_OK;
+}
+
+int pcap_setfilter(pcap_t *p, struct bpf_program *fp)
+{
+    return DPDKPCAP_OK;
+}
+
+const u_char* pcap_next(pcap_t *p, struct pcap_pkthdr *h)
+{
+    return NULL;
+}
+
+int pcap_is_swapped(pcap_t *p)
+{
+    return 0;
+}
+
+int pcap_stats(pcap_t *p, struct pcap_stat *ps)
+{
+    return DPDKPCAP_OK;
+}
+
+pcap_t* pcap_open_dead(int linktype, int snaplen)
+{
+    return NULL;
+}
+
+pcap_t* pcap_open_offline(const char *fname, char *errbuf)
+{
+    return NULL;
+}
+
+FILE* pcap_file(pcap_t *p)
+{
+    return NULL;
+}
+
+int pcap_major_version(pcap_t *p)
+{
+    return 0;
+}
+
+int pcap_minor_version(pcap_t *p)
+{
+    return 0;
+}
+
+int
+pcap_compile(pcap_t *p, struct bpf_program *program,
+         const char *buf, int optimize, bpf_u_int32 mask)
+{
+    return DPDKPCAP_OK;
+}
+
+int
+pcap_snapshot(pcap_t *p)
+{
+    return DPDKPCAP_OK;
+}
+
+int
+pcap_datalink(pcap_t *p)
+{
+    return DPDKPCAP_OK;
+}
+
+int pcap_lookupnet (const char *device, bpf_u_int32 *localnet,
+                    bpf_u_int32 *netmask, char *errbuf)
+{
+    return DPDKPCAP_OK;
+}
+
+int
+pcap_list_datalinks(pcap_t *p, int **dlt_buffer)
+{
+    return DPDKPCAP_OK;
+}
+
