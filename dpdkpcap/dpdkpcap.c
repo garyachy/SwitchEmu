@@ -28,7 +28,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define debug printf
@@ -39,7 +39,7 @@
 static const char pcap_version_string[] = "dpdk pcap version 0.1";
 static char errbuf_g[PCAP_ERRBUF_SIZE];
 
-#define VER_16
+//#define VER_16
 
 #define DPDKPCAP_MBUF_SIZE       (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 #define DPDKPCAP_NB_MBUF         512
@@ -472,7 +472,8 @@ int pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
         pPcapIf->name = malloc(DPDKPCAP_IF_NAMESIZE);
         memset(pPcapIf->name, 0, DPDKPCAP_IF_NAMESIZE);
 
-        snprintf(pPcapIf->name, DPDKPCAP_IF_NAMESIZE, "enp%us%u",
+        snprintf(pPcapIf->name, DPDKPCAP_IF_NAMESIZE, "port%ubus%udev%u",
+                 port,
                  info.pci_dev->addr.bus,
                  info.pci_dev->addr.devid);
 
@@ -540,10 +541,6 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
 
     rte_memcpy(mbuf->pkt.data, buf, size);
     mbuf->pkt.data_len = size;
-
-#ifdef DEBUG
-    rte_pktmbuf_dump(mbuf, 0);
-#endif
 
     ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
     if (ret < 1)
