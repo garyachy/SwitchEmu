@@ -18,7 +18,7 @@
 #define RX_HANDLE 1
 
 #define HANDLE_NUM 10
-#define REPEAT_NUM 10
+#define REPEAT_NUM 10000
 
 time_t start, end;
 

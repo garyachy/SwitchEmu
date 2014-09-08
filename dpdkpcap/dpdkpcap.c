@@ -541,6 +541,8 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
 
     rte_memcpy(mbuf->pkt.data, buf, size);
     mbuf->pkt.data_len = size;
+    mbuf->pkt.pkt_len = size;
+    mbuf->pkt.nb_segs = 1;
 
     ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
     if (ret < 1)
