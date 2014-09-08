@@ -15,6 +15,7 @@ LIBS += -Ldpdkpcap -ldpdkpcap
 LIBS += -L$(RTE_SDK)/$(RTE_TARGET)/lib -lintel_dpdk
 LIBS += -pthread
 LIBS += -ldl
+LIBS += -lrt
 #LIBS += -lpcap
  
 # compile flags

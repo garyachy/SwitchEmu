@@ -28,7 +28,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define debug printf
