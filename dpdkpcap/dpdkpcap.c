@@ -722,6 +722,7 @@ static int txLoop(void* arg)
     int portId = args_p->portId;
 
     int lcoreId = rte_lcore_id();
+    int packets = 0;
 
     debug("Starting transmit: core %u, port %u, packets num %d\n", lcoreId, portId, number);
 
@@ -733,8 +734,13 @@ static int txLoop(void* arg)
         {
             snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not send a packet on port %d\n", portId);
             rte_pktmbuf_free(mbuf_g);
+
+            debug("Transmitted %u packets\n", packets);
+
             return DPDKPCAP_FAILURE;
         }
+
+        packets++;
 
         if (args_p->number > 0)
         {
