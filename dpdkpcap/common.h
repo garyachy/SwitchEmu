@@ -23,6 +23,12 @@ struct pcap
     int deviceId;
 };
 
+typedef struct dpdkpcap_tx_args_s
+{
+    int portId;
+    int number;
+} dpdkpcap_tx_args_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,6 +36,8 @@ extern "C" {
 int linkStatusGet(const char* device);
 int rxStatsGet(pcap_t *p);
 int txStatsGet(pcap_t *p);
+
+int dpdpcap_transmit_in_loop(pcap_t *p, const u_char *buf, int size, int number);
 
 #ifdef __cplusplus
 }

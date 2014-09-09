@@ -247,22 +247,46 @@ int test2()
 int test3()
 {
     char errbuf[PCAP_ERRBUF_SIZE];
-    char *device = NULL;
+    char *deviceName = NULL;
+    pcap_t *handle = NULL;
+    u_char packet[PACKET_SIZE];
 
-    if ( (device = pcap_lookupdev(errbuf)) == NULL)
+    int packets_number = 1000000;
+
+    createPacket(packet);
+
+    if ( (deviceName = pcap_lookupdev(errbuf)) == NULL)
     {
         return -1;
     }
 
-    printf("Found a device %s\n", device);
+    handle = pcap_open_live(deviceName, BUFSIZ, 1, 1000, errbuf);
+    if (handle == NULL)
+    {
+        printf("Couldn't open device %s: %s\n", deviceName, errbuf);
+        return -1;
+    }
+
+    printf("Sending %u packets\n", packets_number);
+
+    start_timer();
+
+    if (dpdpcap_transmit_in_loop(handle, packet, sizeof(packet), packets_number) < 0)
+    {
+        printf("dpdpcap_transmit_in_loop failed : %s\n", pcap_geterr(handle));
+        return -1;
+    }
+
+    stop_timer();
+    print_rates(packets_number, PACKET_SIZE);
 
     return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    (test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
-    (test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
+    //(test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
+    //(test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
     (test3() == 0) ? printf("Test 3 - OK\n") : printf("Test 3 - FAILED\n");
 
     return(0);

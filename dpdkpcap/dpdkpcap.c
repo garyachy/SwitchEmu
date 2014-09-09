@@ -28,7 +28,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define debug printf
@@ -71,6 +71,8 @@ char* deviceNames[RTE_MAX_ETHPORTS] = {NULL};
 
 static u_char data_g[PACKET_SIZE];
 static struct pcap_pkthdr pktHeader_g;
+
+static struct rte_mbuf* mbuf_g = NULL;
 
 int linkStatusGet(const char* device)
 {
@@ -709,6 +711,84 @@ int pcap_lookupnet (const char *device, bpf_u_int32 *localnet,
 int
 pcap_list_datalinks(pcap_t *p, int **dlt_buffer)
 {
+    return DPDKPCAP_OK;
+}
+
+static int txLoop(void* arg)
+{
+    int ret = 0;
+    dpdkpcap_tx_args_t* args_p = (dpdkpcap_tx_args_t*)arg;
+    int number = args_p->number;
+    int portId = args_p->portId;
+
+    int lcoreId = rte_lcore_id();
+
+    debug("Starting transmit: core %u, port %u, packets num %d\n", lcoreId, portId, number);
+
+    while (number)
+    {
+        rte_pktmbuf_refcnt_update(mbuf_g, 1);
+        ret = rte_eth_tx_burst(portId, 0, &mbuf_g, 1);
+        if (ret < 1)
+        {
+            snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not send a packet on port %d\n", portId);
+            rte_pktmbuf_free(mbuf_g);
+            return DPDKPCAP_FAILURE;
+        }
+        number--;
+    }
+
+    debug("Finished transmit on core %u\n", lcoreId);
+
+    return DPDKPCAP_OK;
+}
+
+int dpdpcap_transmit_in_loop(pcap_t *p, const u_char *buf, int size, int number)
+{
+    int transmitLcoreId = 0;
+
+    if (p == NULL || buf == NULL ||
+        p->deviceId < 0 || p->deviceId > RTE_MAX_ETHPORTS)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Invalid parameter");
+        return DPDKPCAP_FAILURE;
+    }
+
+    mbuf_g = rte_pktmbuf_alloc(txPool);
+    if (mbuf_g == NULL)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not allocate buffer on port %d\n", p->deviceId);
+        return DPDKPCAP_FAILURE;
+    }
+
+    if (mbuf_g->buf_len < size)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Can not copy packet data : packet size %d, mbuf length %d, port %d\n",
+               size, mbuf_g->buf_len, p->deviceId);
+        return DPDKPCAP_FAILURE;
+    }
+
+    rte_memcpy(mbuf_g->pkt.data, buf, size);
+    mbuf_g->pkt.data_len = size;
+    mbuf_g->pkt.pkt_len = size;
+    mbuf_g->pkt.nb_segs = 1;
+
+    dpdkpcap_tx_args_t args;
+    args.number = number;
+    args.portId = p->deviceId;
+    transmitLcoreId = p->deviceId + 1;
+
+    debug("Transferring TX loop to the core %u\n", transmitLcoreId);
+
+    if (rte_eal_remote_launch(txLoop, &args, transmitLcoreId) < 0)
+    {
+        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Can not run TX on a slave core: transmitLcoreId %d\n",
+                  transmitLcoreId);
+        return DPDKPCAP_FAILURE;
+    }
+
+    rte_eal_wait_lcore(transmitLcoreId);
+
     return DPDKPCAP_OK;
 }
 
