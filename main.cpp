@@ -280,6 +280,8 @@ int test3()
     stop_timer();
     print_rates(packets_number, PACKET_SIZE);
 
+    pcap_close(handle);
+
     return 0;
 }
 
