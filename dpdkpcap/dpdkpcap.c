@@ -725,7 +725,7 @@ static int txLoop(void* arg)
 
     debug("Starting transmit: core %u, port %u, packets num %d\n", lcoreId, portId, number);
 
-    while (number)
+    while (1)
     {
         rte_pktmbuf_refcnt_update(mbuf_g, 1);
         ret = rte_eth_tx_burst(portId, 0, &mbuf_g, 1);
@@ -735,7 +735,14 @@ static int txLoop(void* arg)
             rte_pktmbuf_free(mbuf_g);
             return DPDKPCAP_FAILURE;
         }
-        number--;
+
+        if (args_p->number > 0)
+        {
+            if (number < 1)
+                break;
+
+            number--;
+        }
     }
 
     debug("Finished transmit on core %u\n", lcoreId);

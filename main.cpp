@@ -251,7 +251,7 @@ int test3()
     pcap_t *handle = NULL;
     u_char packet[PACKET_SIZE];
 
-    int packets_number = 1000000;
+    int packets_number = REPEAT_NUM;
 
     createPacket(packet);
 
@@ -271,7 +271,7 @@ int test3()
 
     start_timer();
 
-    if (dpdpcap_transmit_in_loop(handle, packet, sizeof(packet), packets_number) < 0)
+    if (dpdpcap_transmit_in_loop(handle, packet, sizeof(packet), -1) < 0)
     {
         printf("dpdpcap_transmit_in_loop failed : %s\n", pcap_geterr(handle));
         return -1;
