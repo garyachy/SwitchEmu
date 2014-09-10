@@ -72,7 +72,8 @@ char* deviceNames[RTE_MAX_ETHPORTS] = {NULL};
 static u_char data_g[PACKET_SIZE];
 static struct pcap_pkthdr pktHeader_g;
 
-static struct rte_mbuf* mbuf_g = NULL;
+#define DEF_PKT_BURST 32
+static struct rte_mbuf* mbuf_g[DEF_PKT_BURST];
 
 int linkStatusGet(const char* device)
 {
@@ -723,31 +724,39 @@ static int txLoop(void* arg)
 
     int lcoreId = rte_lcore_id();
     int packets = 0;
+    int i = 0;
 
     debug("Starting transmit: core %u, port %u, packets num %d\n", lcoreId, portId, number);
 
     while (1)
     {
-        rte_pktmbuf_refcnt_update(mbuf_g, 1);
-        ret = rte_eth_tx_burst(portId, 0, &mbuf_g, 1);
-        if (ret < 1)
+        for (i = 0; i < DEF_PKT_BURST; i++)
+        {
+            rte_pktmbuf_refcnt_update(mbuf_g[i], 1);
+        }
+
+        ret = rte_eth_tx_burst(portId, 0, mbuf_g, DEF_PKT_BURST);
+        if (ret < DEF_PKT_BURST)
         {
             snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not send a packet on port %d\n", portId);
-            rte_pktmbuf_free(mbuf_g);
+            for (i = DEF_PKT_BURST - ret; i < DEF_PKT_BURST; i++)
+            {
+                rte_pktmbuf_free(mbuf_g[i]);
+            }
 
             debug("Transmitted %u packets\n", packets);
 
             return DPDKPCAP_FAILURE;
         }
 
-        packets++;
+        packets += DEF_PKT_BURST;
 
         if (args_p->number > 0)
         {
             if (number < 1)
                 break;
 
-            number--;
+            number -= DEF_PKT_BURST;
         }
     }
 
@@ -759,6 +768,7 @@ static int txLoop(void* arg)
 int dpdpcap_transmit_in_loop(pcap_t *p, const u_char *buf, int size, int number)
 {
     int transmitLcoreId = 0;
+    int i = 0;
 
     if (p == NULL || buf == NULL ||
         p->deviceId < 0 || p->deviceId > RTE_MAX_ETHPORTS)
@@ -767,24 +777,29 @@ int dpdpcap_transmit_in_loop(pcap_t *p, const u_char *buf, int size, int number)
         return DPDKPCAP_FAILURE;
     }
 
-    mbuf_g = rte_pktmbuf_alloc(txPool);
-    if (mbuf_g == NULL)
+    for (i = 0; i < DEF_PKT_BURST; i++)
     {
-        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not allocate buffer on port %d\n", p->deviceId);
-        return DPDKPCAP_FAILURE;
-    }
+        mbuf_g[i] = rte_pktmbuf_alloc(txPool);
+        if (mbuf_g[i] == NULL)
+        {
+            snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not allocate buffer on port %d\n", p->deviceId);
+            return DPDKPCAP_FAILURE;
+        }
 
-    if (mbuf_g->buf_len < size)
-    {
-        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Can not copy packet data : packet size %d, mbuf length %d, port %d\n",
-               size, mbuf_g->buf_len, p->deviceId);
-        return DPDKPCAP_FAILURE;
-    }
+        struct rte_mbuf* mbuf = mbuf_g[i];
 
-    rte_memcpy(mbuf_g->pkt.data, buf, size);
-    mbuf_g->pkt.data_len = size;
-    mbuf_g->pkt.pkt_len = size;
-    mbuf_g->pkt.nb_segs = 1;
+        if (mbuf->buf_len < size)
+        {
+            snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Can not copy packet data : packet size %d, mbuf length %d, port %d\n",
+                   size, mbuf->buf_len, p->deviceId);
+            return DPDKPCAP_FAILURE;
+        }
+
+        rte_memcpy(mbuf->pkt.data, buf, size);
+        mbuf->pkt.data_len = size;
+        mbuf->pkt.pkt_len = size;
+        mbuf->pkt.nb_segs = 1;
+    }
 
     dpdkpcap_tx_args_t args;
     args.number = number;

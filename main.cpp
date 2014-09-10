@@ -18,7 +18,7 @@
 #define RX_HANDLE 1
 
 #define HANDLE_NUM 10
-#define REPEAT_NUM 10000
+#define REPEAT_NUM 1000000
 
 time_t start, end;
 
@@ -271,7 +271,7 @@ int test3()
 
     start_timer();
 
-    if (dpdpcap_transmit_in_loop(handle, packet, sizeof(packet), -1) < 0)
+    if (dpdpcap_transmit_in_loop(handle, packet, sizeof(packet), packets_number) < 0)
     {
         printf("dpdpcap_transmit_in_loop failed : %s\n", pcap_geterr(handle));
         return -1;
