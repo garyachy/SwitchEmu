@@ -32,11 +32,12 @@ void stop_timer()
     time (&end);
 }
 
-void print_rates(int pktCount, int pktSize)
+void print_rates(unsigned long long pktCount, unsigned long long pktSize)
 {
     double diff = difftime (end, start);
-    printf ("Sent/received %d packets of size %d per %.2lf seconds\n", pktCount, pktSize, diff);
-    printf ("Rate is %.2lf pps or %.2lf bps\n", pktCount/diff, (pktCount * pktSize * 8)/diff);
+    unsigned long long byteCount = pktCount * pktSize * 8;
+    printf ("Sent/received %llu packets or %llu bytes per %.2lf seconds\n", pktCount, byteCount, diff);
+    printf ("Rate is %.2lf pps or %.2lf bps\n", pktCount/diff, byteCount/diff);
 }
 
 void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char*packet)
@@ -135,7 +136,7 @@ int test1()
             return -1;
         }
 
-        debug("Receiving a packet %d\n", i + 1);
+    /*    debug("Receiving a packet %d\n", i + 1);
 
         if (pcap_next_ex(handles[RX_HANDLE], &header, &pktdata) < 0)
         {
@@ -143,7 +144,7 @@ int test1()
             continue;
         }
 
-        debug("Received a buffer of length %d\n", header->len);
+        debug("Received a buffer of length %d\n", header->len);*/
     }
 
     stop_timer();
@@ -287,7 +288,7 @@ int test3()
 
 int main(int argc, char *argv[])
 {
-    //(test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
+    (test1() == 0) ? printf("Test 1 - OK\n") : printf("Test 1 - FAILED\n");
     //(test2() == 0) ? printf("Test 2 - OK\n") : printf("Test 2 - FAILED\n");
     (test3() == 0) ? printf("Test 3 - OK\n") : printf("Test 3 - FAILED\n");
 

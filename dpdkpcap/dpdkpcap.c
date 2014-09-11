@@ -28,7 +28,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define debug printf
@@ -73,7 +73,7 @@ static u_char data_g[PACKET_SIZE];
 static struct pcap_pkthdr pktHeader_g;
 
 #define DEF_PKT_BURST 32
-static struct rte_mbuf* mbuf_g[DEF_PKT_BURST];
+static struct rte_mbuf* mbuf_g[DEF_PKT_BURST] = {NULL};
 
 int linkStatusGet(const char* device)
 {
@@ -547,12 +547,13 @@ int pcap_sendpacket(pcap_t *p, const u_char *buf, int size)
     mbuf->pkt.pkt_len = size;
     mbuf->pkt.nb_segs = 1;
 
-    ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
-    if (ret < 1)
+    while (1)
     {
-        snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not send a packet on port %d\n", p->deviceId);
-        rte_pktmbuf_free(mbuf);
-        return DPDKPCAP_FAILURE;
+        ret = rte_eth_tx_burst(p->deviceId, 0, &mbuf, 1);
+        if (ret == 1)
+        {
+            break;
+        }
     }
 
     debug("Sent a packet to port %d\n", p->deviceId);
@@ -730,33 +731,26 @@ static int txLoop(void* arg)
 
     while (1)
     {
-        for (i = 0; i < DEF_PKT_BURST; i++)
-        {
-            rte_pktmbuf_refcnt_update(mbuf_g[i], 1);
-        }
-
         ret = rte_eth_tx_burst(portId, 0, mbuf_g, DEF_PKT_BURST);
         if (ret < DEF_PKT_BURST)
         {
-            snprintf (errbuf_g, PCAP_ERRBUF_SIZE, "Could not send a packet on port %d\n", portId);
-            for (i = DEF_PKT_BURST - ret; i < DEF_PKT_BURST; i++)
-            {
-                rte_pktmbuf_free(mbuf_g[i]);
-            }
-
-            debug("Transmitted %u packets\n", packets);
-
-            return DPDKPCAP_FAILURE;
+            debug("Transmitted %u packets\n", ret);
         }
 
-        packets += DEF_PKT_BURST;
+        for (i = 0; i < ret; i++)
+        {
+             // rte_pktmbuf_free(mbuf_g[i]);
+             rte_pktmbuf_refcnt_update(mbuf_g[i], 1);
+        }
+
+        packets += ret;
 
         if (args_p->number > 0)
         {
             if (number < 1)
                 break;
 
-            number -= DEF_PKT_BURST;
+            number -= ret;
         }
     }
 
@@ -799,6 +793,8 @@ int dpdpcap_transmit_in_loop(pcap_t *p, const u_char *buf, int size, int number)
         mbuf->pkt.data_len = size;
         mbuf->pkt.pkt_len = size;
         mbuf->pkt.nb_segs = 1;
+
+        rte_pktmbuf_refcnt_update(mbuf, 1);
     }
 
     dpdkpcap_tx_args_t args;
