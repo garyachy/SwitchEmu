@@ -90,8 +90,8 @@ int test1()
     u_char packet[PACKET_SIZE];
     int i = 0;
     int status = 0;
-    int rxPackets = 0;
-    int txPackets = 0;
+    dpdkpcap_stats_t rxPackets;
+    dpdkpcap_stats_t txPackets;
 
     memset(handles, 0, sizeof(handles));
 
@@ -159,14 +159,10 @@ int test1()
             continue;
 
         rxPackets = rxStatsGet(handles[i]);
-        if (rxPackets < 0)
-            continue;
-
         txPackets = txStatsGet(handles[i]);
-        if (txPackets < 0)
-            continue;
 
-        printf("%d : RX : %d, TX : %d \n", i, rxPackets, txPackets);
+        printf("%d : RX : %lld, RX errors: %lld \n", i, rxPackets.packets, rxPackets.errors);
+        printf("%d : TX : %lld, TX errors : %lld \n", i, txPackets.packets, txPackets.errors);
 
         pcap_close(handles[i]);
     }
@@ -303,8 +299,8 @@ int test4()
     u_char packet[PACKET_SIZE];
     int i = 0;
     int status = 0;
-    int rxPackets = 0;
-    int txPackets = 0;
+    dpdkpcap_stats_t rxPackets;
+    dpdkpcap_stats_t txPackets;
 
     memset(handles, 0, sizeof(handles));
 
@@ -370,14 +366,10 @@ int test4()
             continue;
 
         rxPackets = rxStatsGet(handles[i]);
-        if (rxPackets < 0)
-            continue;
-
         txPackets = txStatsGet(handles[i]);
-        if (txPackets < 0)
-            continue;
 
-        printf("%d : RX : %d, TX : %d \n", i, rxPackets, txPackets);
+        printf("%d : RX : %lld, RX errors: %lld \n", i, rxPackets.packets, rxPackets.errors);
+        printf("%d : TX : %lld, TX errors : %lld \n", i, txPackets.packets, txPackets.errors);
 
         pcap_close(handles[i]);
     }

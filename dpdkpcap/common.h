@@ -23,6 +23,12 @@ struct pcap
     int deviceId;
 };
 
+typedef struct dpdkpcap_stats_s
+{
+    unsigned long long packets;
+    unsigned long long errors;
+} dpdkpcap_stats_t;
+
 typedef struct dpdkpcap_tx_args_s
 {
     int portId;
@@ -34,8 +40,8 @@ extern "C" {
 #endif
 
 int linkStatusGet(const char* device);
-int rxStatsGet(pcap_t *p);
-int txStatsGet(pcap_t *p);
+dpdkpcap_stats_t rxStatsGet(pcap_t *p);
+dpdkpcap_stats_t txStatsGet(pcap_t *p);
 
 int dpdpcap_transmit_in_loop(pcap_t *p, const u_char *buf, int size, int number);
 
